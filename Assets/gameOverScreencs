@@ -1,0 +1,56 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using TMPro;
+
+public class GameOverScreen : MonoBehaviour
+{
+    public GameObject gameOverPanel;
+    public TextMeshProUGUI gameOverText;
+    public TextMeshProUGUI buttonText;
+    public Button returnToMainMenuButton;
+
+    // Add references to the UI elements you want to hide
+    public GameObject[] uiElementsToHide;
+
+    void Start()
+    {
+        gameOverPanel.SetActive(false);
+        returnToMainMenuButton.onClick.AddListener(ReturnToMainMenu);
+    }
+
+    public void ShowGameOver()
+    {
+        HideGameUI();
+        gameOverPanel.SetActive(true);
+        gameOverText.text = "You Lose!";
+    }
+
+    public void ShowVictory()
+    {
+        HideGameUI();
+        gameOverPanel.SetActive(true);
+        gameOverText.text = "You Win!";
+        buttonText.text = "Map";
+    }
+
+    void ReturnToMainMenu()
+    {
+        SceneManager.LoadScene("MainMenu"); // Make sure your main menu scene is named "MainMenu"
+    }
+
+    void HideGameUI()
+    {
+        foreach (GameObject uiElement in uiElementsToHide)
+        {
+            if (uiElement != null)
+            {
+                uiElement.SetActive(false);
+            }
+            else
+            {
+                Debug.LogWarning("A UI element in the uiElementsToHide array is null. Please check the Inspector.");
+            }
+        }
+    }
+}
