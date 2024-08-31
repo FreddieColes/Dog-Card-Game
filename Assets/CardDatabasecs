@@ -1,0 +1,82 @@
+using UnityEngine;
+using System.Collections.Generic;
+
+[System.Serializable]
+public class CardDefinition
+{
+    public int id;
+    public string cardName;
+    public int cost;
+    public string description;
+    public int damage;
+    public int drawAmount;
+    public int healAmount;
+    public float tugOfWarValue;
+    public Sprite cardImage;
+
+    public CardDefinition(int id, string cardName, int cost, string description, int damage, int drawAmount, int healAmount, float tugOfWarValue, Sprite cardImage = null)
+    {
+        this.id = id;
+        this.cardName = cardName;
+        this.cost = cost;
+        this.description = description;
+        this.damage = damage;
+        this.drawAmount = drawAmount;
+        this.healAmount = healAmount;
+        this.tugOfWarValue = tugOfWarValue;
+        this.cardImage = cardImage;
+    }
+}
+
+public class CardDatabase : MonoBehaviour
+{
+    public List<CardDefinition> cardDefinitions = new List<CardDefinition>();
+
+    void Awake()
+    {
+        InitializeCardDatabase();
+    }
+
+    void InitializeCardDatabase()
+    {
+        // Updated card definitions with tug-of-war values
+        AddCard(1, "Fireball", 2, "Deal 3 damage and pull 2 towards victory", 3, 0, 0, 2);
+        AddCard(2, "Heal", 1, "Heal 2 HP", 0, 0, 2, 0);
+        AddCard(3, "Draw", 1, "Draw 2 cards", 0, 2, 0, 0f);
+        AddCard(4, "Meteor", 4, "Deal 5 damage, draw 1 card, and pull 3 towards victory", 5, 1, 0, 3);
+        AddCard(5, "Life Drain", 3, "Deal 2 damage, heal 2 HP, and pull 1 towards victory", 2, 0, 2, 1);
+        AddCard(6, "Flame Shield", 2, "Gain 3 armor, deal 1 damage, and pull 1 towards victory", 1, 0, 0, 1);
+    }
+
+    public void AddCard(int id, string cardName, int cost, string description, int damage, int drawAmount, int healAmount, float tugOfWarValue, Sprite cardImage = null)
+    {
+        cardDefinitions.Add(new CardDefinition(id, cardName, cost, description, damage, drawAmount, healAmount, tugOfWarValue, cardImage));
+    }
+
+    public CardDefinition GetCardById(int id)
+    {
+        return cardDefinitions.Find(card => card.id == id);
+    }
+}
+
+// Updated Card class
+public class Card
+{
+    public CardDefinition definition;
+
+    public Card(CardDefinition definition)
+    {
+        this.definition = definition;
+    }
+
+    // Helper properties for easy access
+    public int Id => definition.id;
+    public string Name => definition.cardName;
+    public int Cost => definition.cost;
+    public string Description => definition.description;
+    public int Damage => definition.damage;
+    public int DrawAmount => definition.drawAmount;
+    public int HealAmount => definition.healAmount;
+    public float TugOfWarValue => definition.tugOfWarValue;
+    public Sprite Image => definition.cardImage;
+}
