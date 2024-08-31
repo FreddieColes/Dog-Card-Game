@@ -1,0 +1,84 @@
+using UnityEngine;
+using TMPro;
+using System.Collections.Generic;
+
+public class EnemyManager : MonoBehaviour
+{
+    public TextMeshProUGUI attackValueText;
+    public TextMeshProUGUI tugOfWarDamageText;
+    public PlayerHealth playerHealth;
+    public TugOfWarSlider tugOfWarSlider;
+
+    private List<List<(int damage, int tugOfWarValue)>> attackOptions = new List<List<(int, int)>>
+    {
+        new List<(int, int)> { (30, 0), (3, 0), (30, 0) },
+        new List<(int, int)> { (30, 0), (30, 0), (30, 0) },
+        new List<(int, int)> { (3, 0), (30, 0), (30, 0) }
+    };
+
+    private int currentAttackValue;
+    private int currentTugOfWarValue;
+
+    void Start()
+    {
+        if (playerHealth == null)
+        {
+            playerHealth = FindObjectOfType<PlayerHealth>();
+            if (playerHealth == null)
+            {
+                Debug.LogError("PlayerHealth not found in the scene. Please assign it in the inspector.");
+            }
+        }
+
+        if (tugOfWarSlider == null)
+        {
+            tugOfWarSlider = FindObjectOfType<TugOfWarSlider>();
+            if (tugOfWarSlider == null)
+            {
+                Debug.LogError("TugOfWarSlider not found in the scene. Please assign it in the inspector.");
+            }
+        }
+
+        SetRandomAttackValue();
+    }
+
+    public void SetRandomAttackValue()
+    {
+        List<(int, int)> chosenOption = attackOptions[Random.Range(0, attackOptions.Count)];
+        (currentAttackValue, currentTugOfWarValue) = chosenOption[Random.Range(0, chosenOption.Count)];
+        UpdateAttackValueDisplay();
+    }
+
+    void UpdateAttackValueDisplay()
+    {
+        if (attackValueText != null)
+        {
+            attackValueText.text = $"Enemy Attack: {currentAttackValue}";
+        }
+        else
+        {
+            Debug.LogWarning("Attack Value Text UI element is not assigned in the EnemyManager.");
+        }
+
+        if (tugOfWarDamageText != null)
+        {
+            tugOfWarDamageText.text = $"ToW Dmg: {currentTugOfWarValue}";
+        }
+        else
+        {
+            Debug.LogWarning("Tug of War Damage Text UI element is not assigned in the EnemyManager.");
+        }
+    }
+
+    public void PerformAttack()
+    {
+        playerHealth.TakeDamage(currentAttackValue);
+
+        if (tugOfWarSlider != null && currentTugOfWarValue != 0)
+        {
+            tugOfWarSlider.UpdateSlider(-currentTugOfWarValue);
+        }
+
+        SetRandomAttackValue();
+    }
+}
