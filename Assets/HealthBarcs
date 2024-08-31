@@ -1,0 +1,47 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+public class HealthBar : MonoBehaviour
+{
+    public Slider fillImage;
+    public PlayerHealth playerHealth;
+    public TextMeshProUGUI healthText; // New field for the health text
+
+    void Start()
+    {
+        if (playerHealth == null)
+        {
+            playerHealth = FindObjectOfType<PlayerHealth>();
+            if (playerHealth == null)
+            {
+                Debug.LogError("PlayerHealth not found in the scene. Please assign it in the inspector.");
+            }
+        }
+
+        if (healthText == null)
+        {
+            Debug.LogWarning("Health Text UI element is not assigned in the HealthBar. Please assign it in the inspector.");
+        }
+
+        playerHealth.OnHealthChanged += UpdateHealthBar;
+    }
+
+    void OnDisable()
+    {
+        if (playerHealth != null)
+        {
+            playerHealth.OnHealthChanged -= UpdateHealthBar;
+        }
+    }
+
+    void UpdateHealthBar(int currentHealth, int maxHealth)
+    {
+        fillImage.value = (float)currentHealth / maxHealth;
+
+        if (healthText != null)
+        {
+            healthText.text = $"{currentHealth}/{maxHealth}";
+        }
+    }
+}
