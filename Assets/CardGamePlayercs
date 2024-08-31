@@ -1,0 +1,368 @@
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
+using System.Collections.Generic;
+using TMPro;
+
+public class CardGamePlayer : MonoBehaviour
+{
+    public DeckManager deckManager;
+    public GameObject cardPrefab;
+    public Transform cardContainer;
+    public Transform deckPosition;
+    public float cardSpacing = 1.2f;
+    public float hoverSpacing = 0.3f;
+    public float returnThreshold = 2f;
+    public float drawDelay = 0.5f;
+    public CardLayerManager layerManager;
+    public float drawAnimationDuration = 0.5f;
+    public AnimationCurve drawAnimationCurve;
+
+    private List<GameObject> cardObjects = new List<GameObject>();
+    private GameObject hoveredCard;
+
+    public PlayerHealth playerHealth;
+    public EnergyManager energyManager;
+    public EnemyHealth enemyHealth;
+
+    public TugOfWarSlider tugOfWarSlider;
+
+    public CardLayerManager cardLayerManager;
+
+    void Start()
+    {
+        InitializeComponents();
+
+    }
+
+    void InitializeComponents()
+    {
+        if (layerManager == null) layerManager = GetComponent<CardLayerManager>();
+        if (energyManager == null) energyManager = GetComponent<EnergyManager>();
+        if (enemyHealth == null) enemyHealth = FindObjectOfType<EnemyHealth>();
+        if (cardLayerManager == null) cardLayerManager = GetComponent<CardLayerManager>();
+
+        if (layerManager == null || energyManager == null || enemyHealth == null || cardLayerManager == null)
+        {
+            Debug.LogError("One or more required components are missing. Please check the inspector.");
+        }
+    }  
+
+    public int GetHandSize()
+    {
+        return cardObjects.Count;
+    }
+
+
+    GameObject CreateCardObject(Card card)
+    {
+        GameObject cardObj = Instantiate(cardPrefab, deckPosition.position, Quaternion.identity, cardContainer);
+
+        CardInteraction cardInteraction = cardObj.GetComponent<CardInteraction>();
+        if (cardInteraction == null)
+        {
+            cardInteraction = cardObj.AddComponent<CardInteraction>();
+        }
+
+        if (cardInteraction != null)
+        {
+            cardInteraction.Initialize(card, this);
+        }
+        else
+        {
+            Debug.LogError($"Failed to get or add CardInteraction component to card object: {card.Name}");
+        }
+
+        UpdateCardVisuals(cardObj, card);
+
+        if (cardLayerManager != null)
+        {
+            cardLayerManager.RegisterCard(cardObj);
+        }
+
+        return cardObj;
+    }
+
+    void UpdateCardVisuals(GameObject cardObject, Card card)
+    {
+        Debug.Log($"Updating visuals for card: {card.Name}, Cost: {card.Cost}, Description: {card.Description}");
+
+        // Find the Canvas child
+        Canvas canvas = cardObject.GetComponentInChildren<Canvas>();
+        if (canvas == null)
+        {
+            Debug.LogError("No Canvas found in card object hierarchy");
+            return;
+        }
+
+        // Get Text components from the Canvas
+        TextMeshProUGUI[] textComponents = canvas.GetComponentsInChildren<TextMeshProUGUI>();
+        // Get Image components from the entire card object (in case the image is not in the Canvas)
+        Image[] imageComponents = cardObject.GetComponentsInChildren<Image>();
+
+        foreach (TextMeshProUGUI text in textComponents)
+        {
+            switch (text.name)
+            {
+                case "NameText":
+                    text.text = card.Name;
+                    Debug.Log($"Set NameText to: {card.Name}");
+                    break;
+                case "CostText":
+                    text.text = card.Cost.ToString();
+                    Debug.Log($"Set CostText to: {card.Cost}");
+                    break;
+                case "DescriptionText":
+                    text.text = BuildCardDescription(card);
+                    Debug.Log($"Set DescriptionText to: {text.text}");
+                    break;
+                default:
+                    Debug.Log($"Unhandled Text component: {text.name}");
+                    break;
+            }
+        }
+
+        foreach (Image image in imageComponents)
+        {
+            if (image.name == "CardImage" && card.Image != null)
+            {
+                image.sprite = card.Image;
+                Debug.Log("Set CardImage sprite");
+            }
+        }
+    }
+
+    void UpdateCardPositions()
+    {
+        float totalWidth = (cardObjects.Count - 1) * cardSpacing;
+        float startX = -totalWidth / 2;
+
+        for (int i = 0; i < cardObjects.Count; i++)
+        {
+            float targetX = startX + i * cardSpacing;
+
+            if (hoveredCard != null)
+            {
+                int hoveredIndex = cardObjects.IndexOf(hoveredCard);
+                if (i < hoveredIndex)
+                {
+                    targetX -= hoverSpacing;
+                }
+                else if (i > hoveredIndex)
+                {
+                    targetX += hoverSpacing;
+                }
+            }
+
+            Vector3 targetPosition = new Vector3(targetX, 0, 0);
+            cardObjects[i].transform.localPosition = targetPosition;
+        }
+
+        if (layerManager != null)
+        {
+            layerManager.UpdateCardLayers();
+        }
+        if (cardLayerManager != null)
+        {
+            cardLayerManager.OnCardsRepositioned();
+        }
+    }
+
+    string BuildCardDescription(Card card)
+    {
+        List<string> effects = new List<string>();
+
+        if (!string.IsNullOrEmpty(card.Description))
+        {
+            effects.Add(card.Description);
+        }
+
+        if (card.Damage > 0 && !card.Description.Contains("damage"))
+        {
+            effects.Add($"Deal {card.Damage} damage");
+        }
+        if (card.DrawAmount > 0 && !card.Description.Contains("Draw"))
+        {
+            effects.Add($"Draw {card.DrawAmount} card{(card.DrawAmount > 1 ? "s" : "")}");
+        }
+        if (card.HealAmount > 0 && !card.Description.Contains("Heal"))
+        {
+            effects.Add($"Heal {card.HealAmount} HP");
+        }
+        if (card.TugOfWarValue != 0 && !card.Description.ToLower().Contains("towards"))
+        {
+            string direction = card.TugOfWarValue > 0 ? "towards victory" : "towards defeat";
+            effects.Add($"Pull {Mathf.Abs(card.TugOfWarValue)} {direction}");
+        }
+
+        return string.Join("\n", effects);
+    }
+
+    public void StartNewTurn()
+    {
+        StartCoroutine(DrawCardsToHandSize());
+    }
+
+    private IEnumerator DrawCardsToHandSize()
+    {
+        int cardsToDraw = deckManager.maxHandSize - GetHandSize();
+        Debug.Log($"Starting new turn. Current hand size: {GetHandSize()}, Max hand size: {deckManager.maxHandSize}, Drawing {cardsToDraw} cards.");
+
+        for (int i = 0; i < cardsToDraw; i++)
+        {
+            yield return StartCoroutine(DrawSingleCard());
+            yield return new WaitForSeconds(drawDelay);
+        }
+    }
+
+    private IEnumerator DrawSingleCard()
+    {
+        if (deckManager.CanDrawCard())
+        {
+            Card drawnCard = deckManager.DrawCard();
+            if (drawnCard != null)
+            {
+                GameObject cardObj = CreateCardObject(drawnCard);
+                yield return StartCoroutine(AnimateCardDraw(cardObj));
+                cardObjects.Add(cardObj);
+                UpdateCardPositions();
+                Debug.Log($"Drew and animated card: {drawnCard.Name}");
+            }
+            else
+            {
+                Debug.LogWarning("DrawCard returned null despite CanDrawCard being true.");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("Cannot draw more cards. Hand might be full or deck might be empty.");
+        }
+    }
+
+    private IEnumerator AnimateCardDraw(GameObject cardObj)
+    {
+        Vector3 startPosition = deckPosition.position;
+        Vector3 endPosition = cardContainer.position + new Vector3(cardObjects.Count * cardSpacing, 0, 0);
+
+        float elapsedTime = 0f;
+        while (elapsedTime < drawAnimationDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float t = drawAnimationCurve.Evaluate(elapsedTime / drawAnimationDuration);
+            cardObj.transform.position = Vector3.Lerp(startPosition, endPosition, t);
+            yield return null;
+        }
+
+        cardObj.transform.position = endPosition;
+    }
+
+
+    public void PlayCard(Card card, GameObject cardObject)
+    {
+        Debug.Log($"Attempting to play card: {card.Name}");
+        Debug.Log($"Card in hand: {deckManager.hand.Contains(card)}");
+        Debug.Log($"Can play card: {energyManager.CanPlayCard(card.Cost)}");
+        Debug.Log($"Current energy: {energyManager.currentEnergy}, Card cost: {card.Cost}");
+
+        if (deckManager.hand.Contains(card) && energyManager.CanPlayCard(card.Cost))
+        {
+            Debug.Log($"Conditions met. Playing card: {card.Name}");
+            deckManager.PlayCard(card);
+            // Note: Energy consumption is handled by EnergyManager's subscription to OnCardPlayed
+
+            ApplyCardEffects(card);
+
+            if (cardLayerManager != null)
+            {
+                cardLayerManager.UnregisterCard(cardObject);
+            }
+
+            cardObjects.Remove(cardObject);
+            Destroy(cardObject);
+            UpdateCardPositions();
+            Debug.Log($"Card played successfully: {card.Name}");
+        }
+        else
+        {
+            Debug.Log($"Cannot play card: {card.Name}. Cost: {card.Cost}, Current Energy: {energyManager.currentEnergy}");
+            ReturnCardToHand(cardObject);
+        }
+    }
+
+    void ApplyCardEffects(Card card)
+    {
+        if (enemyHealth != null)
+        {
+            enemyHealth.TakeDamage(card.Damage);
+        }
+
+        if (card.DrawAmount > 0)
+        {
+            StartCoroutine(DrawCards(card.DrawAmount));
+        }
+
+        if (card.HealAmount > 0 && playerHealth != null)
+        {
+            playerHealth.Heal(card.HealAmount);
+        }
+
+        if (tugOfWarSlider != null)
+        {
+            tugOfWarSlider.UpdateSlider(card.TugOfWarValue);
+        }
+    }
+
+    public IEnumerator DrawCards(int amount)
+    {
+        for (int i = 0; i < amount; i++)
+        {
+            yield return StartCoroutine(DrawSingleCard());
+            yield return new WaitForSeconds(drawDelay);
+        }
+    }
+
+
+
+    public void ReturnCardToHand(GameObject cardObject)
+    {
+        UpdateCardPositions();
+    }    
+
+    public float GetReturnThreshold()
+    {
+        return returnThreshold;
+    }
+
+    public void DiscardHand()
+    {
+        foreach (GameObject cardObj in cardObjects)
+        {
+            if (layerManager != null)
+            {
+                layerManager.UnregisterCard(cardObj);
+            }
+            Destroy(cardObj);
+        }
+        cardObjects.Clear();
+        hoveredCard = null;
+        deckManager.DiscardHand();
+    }
+
+    public void OnCardHoverStart(GameObject cardObject)
+    {
+        hoveredCard = cardObject;
+        UpdateCardPositions();
+    }
+
+    public void OnCardHoverEnd(GameObject cardObject)
+    {
+        if (hoveredCard == cardObject)
+        {
+            hoveredCard = null;
+            UpdateCardPositions();
+        }
+    }
+
+
+
+}
