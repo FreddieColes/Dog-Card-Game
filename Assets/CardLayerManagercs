@@ -1,0 +1,120 @@
+using UnityEngine;
+using System.Collections.Generic;
+
+public class CardLayerManager : MonoBehaviour
+{
+    public CardGamePlayer cardGamePlayer;
+    public int baseOrderInLayer = 100;
+    public int layerIncrement = 10;
+    public int textLayerOffset = 1;
+    private List<GameObject> cardObjects = new List<GameObject>();
+
+    void Start()
+    {
+        if (cardGamePlayer == null)
+        {
+            cardGamePlayer = FindObjectOfType<CardGamePlayer>();
+            if (cardGamePlayer == null)
+            {
+                Debug.LogError("CardGamePlayer reference is not set and couldn't be found in CardLayerManager.");
+                return;
+            }
+        }
+
+        if (cardGamePlayer.deckManager != null)
+        {
+            cardGamePlayer.deckManager.OnCardDrawn += OnCardDrawn;
+        }
+        else
+        {
+            Debug.LogError("DeckManager is null in CardGamePlayer.");
+        }
+    }
+
+    void OnDisable()
+    {
+        if (cardGamePlayer != null && cardGamePlayer.deckManager != null)
+        {
+            cardGamePlayer.deckManager.OnCardDrawn -= OnCardDrawn;
+        }
+    }
+
+    private void OnCardDrawn()
+    {
+        Debug.Log("Card drawn event received. Updating card layers.");
+        UpdateCardLayers();
+    }
+
+    public void RegisterCard(GameObject cardObject)
+    {
+        if (!cardObjects.Contains(cardObject))
+        {
+            cardObjects.Add(cardObject);
+            Debug.Log($"Card registered: {cardObject.name}. Total cards: {cardObjects.Count}");
+            UpdateCardLayers();
+        }
+    }
+
+    public void UnregisterCard(GameObject cardObject)
+    {
+        if (cardObjects.Contains(cardObject))
+        {
+            cardObjects.Remove(cardObject);
+            Debug.Log($"Card unregistered: {cardObject.name}. Total cards: {cardObjects.Count}");
+            UpdateCardLayers();
+        }
+    }
+
+    public void UpdateCardLayers()
+    {
+        Debug.Log($"Updating layers for {cardObjects.Count} cards.");
+
+        cardObjects.Sort((a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
+
+        for (int i = 0; i < cardObjects.Count; i++)
+        {
+            GameObject cardObj = cardObjects[i];
+            int cardOrder = baseOrderInLayer + i * layerIncrement;
+
+            SetCardLayers(cardObj, cardOrder);
+        }
+    }
+
+    private void SetCardLayers(GameObject cardObj, int baseOrder)
+    {
+        if (cardObj == null)
+        {
+            Debug.LogError("Attempted to set layers for a null card object.");
+            return;
+        }
+
+        SpriteRenderer cardRenderer = cardObj.GetComponent<SpriteRenderer>();
+        if (cardRenderer != null)
+        {
+            cardRenderer.sortingOrder = baseOrder;
+            Debug.Log($"Set card sprite layer for {cardObj.name} to {baseOrder}");
+        }
+        else
+        {
+            Debug.LogWarning($"SpriteRenderer not found on card object {cardObj.name}");
+        }
+
+        Canvas canvas = cardObj.GetComponentInChildren<Canvas>();
+        if (canvas != null)
+        {
+            canvas.sortingOrder = baseOrder + textLayerOffset;
+            Debug.Log($"Set card canvas layer for {cardObj.name} to {baseOrder + textLayerOffset}");
+        }
+        else
+        {
+            Debug.LogWarning($"Canvas not found on card object {cardObj.name}");
+        }
+    }
+
+    // Call this method from CardGamePlayer when cards are repositioned
+    public void OnCardsRepositioned()
+    {
+        Debug.Log("Cards repositioned. Updating layers.");
+        UpdateCardLayers();
+    }
+}
