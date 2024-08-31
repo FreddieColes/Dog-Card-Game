@@ -1,0 +1,110 @@
+using UnityEngine;
+using TMPro;
+
+public class EnergyManager : MonoBehaviour
+{
+    public int maxEnergy = 3;
+    public int currentEnergy;
+
+    public TextMeshProUGUI energyText;
+    public CardGamePlayer player;
+    public GameManager gameManager;
+
+    void Start()
+    {
+        if (player == null)
+        {
+            player = FindObjectOfType<CardGamePlayer>();
+            if (player == null)
+            {
+                Debug.LogError("CardGamePlayer not found in the scene. Please assign it in the inspector.");
+            }
+        }
+
+        if (gameManager == null)
+        {
+            gameManager = FindObjectOfType<GameManager>();
+            if (gameManager == null)
+            {
+                Debug.LogError("GameManager not found in the scene. Please assign it in the inspector.");
+            }
+        }
+
+        ResetEnergy();
+        UpdateEnergyDisplay();
+    }
+
+    void OnEnable()
+    {
+        if (player != null && player.deckManager != null)
+        {
+            player.deckManager.OnCardPlayed += ConsumeEnergy;
+            Debug.Log("EnergyManager: Subscribed to OnCardPlayed event");
+        }
+        else
+        {
+            Debug.LogError("EnergyManager: Failed to subscribe to OnCardPlayed event");
+        }
+        if (gameManager != null)
+        {
+            gameManager.OnTurnStart += ResetEnergy;
+            Debug.Log("EnergyManager: Subscribed to OnTurnStart event");
+        }
+        else
+        {
+            Debug.LogError("EnergyManager: Failed to subscribe to OnTurnStart event");
+        }
+    }
+
+    public bool CanPlayCard(int cardCost)
+    {
+        bool canPlay = currentEnergy >= cardCost;
+        Debug.Log($"EnergyManager: CanPlayCard check - Cost: {cardCost}, Current Energy: {currentEnergy}, Can Play: {canPlay}");
+        return canPlay;
+    }
+
+    public void ConsumeEnergy(Card playedCard)
+    {
+        Debug.Log($"EnergyManager: Attempting to consume energy for card: {playedCard.Name}, Cost: {playedCard.Cost}");
+        if (CanPlayCard(playedCard.Cost))
+        {
+            currentEnergy -= playedCard.Cost;
+            UpdateEnergyDisplay();
+            Debug.Log($"EnergyManager: Energy consumed. New energy: {currentEnergy}");
+        }
+        else
+        {
+            Debug.LogWarning($"EnergyManager: Attempted to consume energy for card {playedCard.Name} but not enough energy");
+        }
+    }
+
+    void OnDisable()
+    {
+        if (player != null && player.deckManager != null)
+        {
+            player.deckManager.OnCardPlayed -= ConsumeEnergy;
+        }
+        if (gameManager != null)
+        {
+            gameManager.OnTurnStart -= ResetEnergy;
+        }
+    }
+
+    public void ResetEnergy()
+    {
+        currentEnergy = maxEnergy;
+        UpdateEnergyDisplay();
+    }
+
+    private void UpdateEnergyDisplay()
+    {
+        if (energyText != null)
+        {
+            energyText.text = $"Energy: {currentEnergy}/{maxEnergy}";
+        }
+        else
+        {
+            Debug.LogWarning("Energy Text UI element is not assigned in the EnergyManager.");
+        }
+    }
+}
