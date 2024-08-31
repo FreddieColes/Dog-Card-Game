@@ -1,0 +1,124 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.Audio;
+using System.Collections.Generic;
+using TMPro;
+
+public class MainMenu : MonoBehaviour
+{
+    [Header("Main Menu Buttons")]
+    public Button startGameButton;
+    public Button continueGameButton;
+    public Button optionsButton;
+    public Button quitGameButton;
+
+    [Header("Options Menu")]
+    public GameObject optionsMenu;
+    public Slider volumeSlider;
+    public TMP_Dropdown audioDeviceDropdown;
+    public Button backToMainButton;
+
+    [Header("Audio")]
+    public AudioMixer audioMixer;
+
+    private void Start()
+    {
+        // Set up button listeners
+        startGameButton.onClick.AddListener(StartGame);
+        continueGameButton.onClick.AddListener(ContinueGame);
+        optionsButton.onClick.AddListener(ShowOptions);
+        quitGameButton.onClick.AddListener(QuitGame);
+        backToMainButton.onClick.AddListener(HideOptions);
+
+        // Set up options
+        volumeSlider.onValueChanged.AddListener(SetVolume);
+        audioDeviceDropdown.onValueChanged.AddListener(SetAudioDevice);
+
+        // Check for save file
+        bool hasSaveFile = CheckForSaveFile();
+        continueGameButton.interactable = hasSaveFile;
+
+        // Populate audio devices dropdown
+        PopulateAudioDevices();
+
+        // Hide options menu initially
+        optionsMenu.SetActive(false);
+    }
+
+    private void StartGame()
+    {
+        Debug.Log("Starting new game...");
+        // Add code to start a new game
+    }
+
+    private void ContinueGame()
+    {
+        Debug.Log("Continuing game...");
+        // Add code to load and continue the game
+    }
+
+    private void ShowOptions()
+    {
+        optionsMenu.SetActive(true);
+        startGameButton.gameObject.SetActive(false);
+        continueGameButton.gameObject.SetActive(false);
+        optionsButton.gameObject.SetActive(false);
+        quitGameButton.gameObject.SetActive(false);
+    }
+
+    private void HideOptions()
+    {
+        optionsMenu.SetActive(false);
+        startGameButton.gameObject.SetActive(true);
+        continueGameButton.gameObject.SetActive(true);
+        optionsButton.gameObject.SetActive(true);
+        quitGameButton.gameObject.SetActive(true);
+    }
+
+    private void QuitGame()
+    {
+        Debug.Log("Quitting game...");
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+    }
+
+    private bool CheckForSaveFile()
+    {
+        // Add code to check for a save file
+        // For now, we'll return false as there's no save file yet
+        return false;
+    }
+
+    private void SetVolume(float volume)
+    {
+        audioMixer.SetFloat("MasterVolume", Mathf.Log10(volume) * 20);
+    }
+
+    private void PopulateAudioDevices()
+    {
+        audioDeviceDropdown.ClearOptions();
+        List<string> devices = new List<string>();
+
+#if !UNITY_WEBGL
+        devices.AddRange(Microphone.devices);
+#endif
+
+        if (devices.Count == 0)
+        {
+            devices.Add("Default Audio Device");
+        }
+
+        audioDeviceDropdown.AddOptions(devices);
+    }
+
+    private void SetAudioDevice(int index)
+    {
+        // Note: Unity doesn't provide a direct way to change the audio output device at runtime.
+        // This method is left as a placeholder for custom audio device selection logic.
+        Debug.Log($"Selected audio device: {audioDeviceDropdown.options[index].text}");
+        // You might need to implement a custom audio output solution if you need this functionality.
+    }
+}
