@@ -1,0 +1,226 @@
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
+using System.Collections.Generic;
+
+public class GameManager : MonoBehaviour
+{
+    public CardGamePlayer player;
+    public EnemyManager enemyManager;
+    public Button endTurnButton;
+    public PlayerHealth playerHealth;
+    public EnemyHealth enemyHealth;
+    public GameOverScreen gameOverScreen;
+    public TugOfWarSlider tugOfWarSlider;
+    public CardDatabase cardDatabase;
+
+    private bool isPlayerTurn = true;
+    private bool isGameOver = false;
+
+    public event System.Action OnTurnStart;
+
+    public List<int> playerDeckCardIds = new List<int>(); // Populate this in the Inspector with card IDs
+    [System.Serializable]
+    public class DeckCardEntry
+    {
+        public int cardId;
+        public int count;
+    }
+
+    public List<DeckCardEntry> playerDeckComposition = new List<DeckCardEntry>();
+    private List<Card> playerDeck = new List<Card>();
+
+    void Start()
+    {
+        if (enemyManager == null)
+        {
+            enemyManager = FindObjectOfType<EnemyManager>();
+            if (enemyManager == null)
+            {
+                Debug.LogError("EnemyManager not found in the scene. Please assign it in the inspector.");
+            }
+        }
+
+        if (playerHealth == null)
+        {
+            playerHealth = FindObjectOfType<PlayerHealth>();
+            if (playerHealth == null)
+            {
+                Debug.LogError("PlayerHealth not found in the scene. Please assign it in the inspector.");
+            }
+        }
+
+        if (enemyHealth == null)
+        {
+            enemyHealth = FindObjectOfType<EnemyHealth>();
+            if (enemyHealth == null)
+            {
+                Debug.LogError("EnemyHealth not found in the scene. Please assign it in the inspector.");
+            }
+        }
+
+        enemyHealth.OnEnemyDefeated += HandleEnemyDefeated;
+
+        InitializePlayerDeck();
+
+        endTurnButton.onClick.AddListener(EndTurn);
+        StartGame();
+    }
+    void OnDisable()
+    {
+        if (enemyHealth != null)
+        {
+            enemyHealth.OnEnemyDefeated -= HandleEnemyDefeated;
+        }
+    }
+
+    void InitializePlayerDeck()
+    {
+        if (cardDatabase == null)
+        {
+            cardDatabase = FindObjectOfType<CardDatabase>();
+            if (cardDatabase == null)
+            {
+                Debug.LogError("CardDatabase not found in the scene. Please assign it in the inspector.");
+                return;
+            }
+        }
+
+        playerDeck.Clear();
+
+        foreach (DeckCardEntry entry in playerDeckComposition)
+        {
+            CardDefinition cardDef = cardDatabase.GetCardById(entry.cardId);
+            if (cardDef != null)
+            {
+                for (int i = 0; i < entry.count; i++)
+                {
+                    playerDeck.Add(new Card(cardDef));
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"Card with ID {entry.cardId} not found in the database.");
+            }
+        }
+
+        Debug.Log($"Player deck initialized with {playerDeck.Count} cards.");
+
+        ShuffleDeck();
+
+        // Assign the deck to the DeckManager
+        if (player != null && player.deckManager != null)
+        {
+            player.deckManager.InitializeDeck(playerDeck);
+        }
+        else
+        {
+            Debug.LogError("Player or DeckManager not properly set up.");
+        }
+    }
+
+    void ShuffleDeck()
+    {
+        System.Random rng = new System.Random();
+        int n = playerDeck.Count;
+        while (n > 1)
+        {
+            n--;
+            int k = rng.Next(n + 1);
+            Card value = playerDeck[k];
+            playerDeck[k] = playerDeck[n];
+            playerDeck[n] = value;
+        }
+    }
+
+    public void HandlePlayerWin()
+    {
+        isGameOver = true;
+        endTurnButton.interactable = false;
+        if (gameOverScreen != null)
+        {
+            gameOverScreen.ShowVictory();
+        }
+        else
+        {
+            Debug.LogError("GameOverScreen is not assigned in GameManager script.");
+        }
+    }
+
+    public void HandlePlayerLose()
+    {
+        isGameOver = true;
+        endTurnButton.interactable = false;
+        if (gameOverScreen != null)
+        {
+            gameOverScreen.ShowGameOver();
+        }
+        else
+        {
+            Debug.LogError("GameOverScreen is not assigned in GameManager script.");
+        }
+    }
+
+    void StartGame()
+    {
+        isGameOver = false;
+        ShuffleDeck(); // Shuffle the deck at the start of each game
+        StartPlayerTurn();
+    }
+
+    void EndTurn()
+    {
+        if (isPlayerTurn && !isGameOver)
+        {
+            isPlayerTurn = false;
+            player.DiscardHand();
+            StartCoroutine(EnemyTurn());
+        }
+    }
+
+    IEnumerator EnemyTurn()
+    {
+        Debug.Log("Enemy's turn");
+
+        yield return new WaitForSeconds(1f); // Short delay before enemy attack
+
+        if (!isGameOver)
+        {
+            enemyManager.PerformAttack();
+        }
+
+        yield return new WaitForSeconds(1f); // Short delay after enemy attack
+
+        if (!isGameOver)
+        {
+            StartPlayerTurn();
+        }
+    }
+
+    void StartPlayerTurn()
+    {
+        isPlayerTurn = true;
+        player.StartNewTurn();
+        OnTurnStart?.Invoke();
+    }
+
+    void HandleEnemyDefeated()
+    {
+        isGameOver = true;
+        endTurnButton.interactable = false;
+        if (gameOverScreen != null)
+        {
+            gameOverScreen.ShowVictory();
+        }
+        else
+        {
+            Debug.LogError("GameOverScreen is not assigned in GameManager script.");
+        }
+    }
+
+    public void SetGameOver()
+    {
+        isGameOver = true;
+        endTurnButton.interactable = false;
+    }
+}
