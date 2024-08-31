@@ -1,0 +1,128 @@
+using UnityEngine;
+using System.Collections;
+
+public class CardInteraction : MonoBehaviour
+{
+    private Card card;
+    private CardGamePlayer player;
+    private Vector3 originalPosition;
+    private Vector3 originalScale;
+    private bool isDragging = false;
+    private bool isInitialized = false;
+    private bool isHovering = false;
+
+    public float hoverScaleFactor = 1.2f;
+    public float hoverDuration = 0.1f;
+
+    public void Initialize(Card card, CardGamePlayer player)
+    {
+        if (card == null || player == null)
+        {
+            Debug.LogError("Cannot initialize CardInteraction with null card or player.");
+            return;
+        }
+
+        this.card = card;
+        this.player = player;
+        isInitialized = true;
+        originalScale = transform.localScale;
+        originalPosition = transform.position;
+        Debug.Log($"Card Initialized: Card Name = {card.Name}, Player = {player.name}");
+    }
+
+    void OnMouseEnter()
+    {
+        if (!isInitialized || isDragging) return;
+        isHovering = true;
+        StartCoroutine(ScaleCard(hoverScaleFactor));
+        player.OnCardHoverStart(this.gameObject);
+    }
+
+    void OnMouseExit()
+    {
+        if (!isInitialized || isDragging) return;
+        isHovering = false;
+        StartCoroutine(ScaleCard(1f));
+        player.OnCardHoverEnd(this.gameObject);
+    }
+
+    void OnMouseDown()
+    {
+        if (!isInitialized)
+        {
+            Debug.LogError("CardInteraction not initialized. Make sure Initialize() is called.");
+            return;
+        }
+
+        isDragging = true;
+        originalPosition = transform.position;
+        Debug.Log($"Mouse Down on Card: Name = {card.Name}, Cost = {card.Cost}");
+    }
+
+    void OnMouseDrag()
+    {
+        if (!isInitialized || !isDragging) return;
+
+        Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        mousePosition.z = 0;
+        transform.position = mousePosition;
+    }
+
+    void OnMouseUp()
+    {
+        if (!isInitialized || !isDragging)
+        {
+            Debug.LogError("CardInteraction not initialized or not dragging. Make sure Initialize() is called.");
+            return;
+        }
+
+        isDragging = false;
+        Debug.Log($"Mouse Up on Card: Name = {card.Name}, Position Y = {transform.position.y}, Threshold = {player.GetReturnThreshold()}");
+
+        if (transform.position.y > player.GetReturnThreshold())
+        {
+            Debug.Log($"Attempting to Play Card: Name = {card.Name}, Cost = {card.Cost}, Damage = {card.Damage}, Draw = {card.DrawAmount}, Heal = {card.HealAmount}");
+            player.PlayCard(card, gameObject);
+        }
+        else
+        {
+            Debug.Log($"Returning Card to Hand: Name = {card.Name}");
+            ReturnToHand();
+        }
+    }
+
+    void ReturnToHand()
+    {
+        transform.position = originalPosition;
+        player.ReturnCardToHand(gameObject);
+    }
+
+    IEnumerator ScaleCard(float targetScale)
+    {
+        Vector3 startScale = transform.localScale;
+        Vector3 endScale = originalScale * targetScale;
+        float elapsedTime = 0;
+
+        while (elapsedTime < hoverDuration)
+        {
+            transform.localScale = Vector3.Lerp(startScale, endScale, elapsedTime / hoverDuration);
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        transform.localScale = endScale;
+    }
+
+    void OnDisable()
+    {
+        // Reset state when the object is disabled or destroyed
+        isInitialized = false;
+        isDragging = false;
+        isHovering = false;
+    }
+
+    public bool IsHovering()
+    {
+        return isHovering;
+    }
+}
