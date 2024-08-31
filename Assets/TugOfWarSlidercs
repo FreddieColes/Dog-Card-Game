@@ -1,0 +1,68 @@
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class TugOfWarSlider : MonoBehaviour
+{
+    public Slider slider;
+    public TextMeshProUGUI valueText;
+    public float minValue = -1f;
+    public float maxValue = 1f;
+    public float startValue = 0f;
+    public float winThreshold = 0.95f;
+    public float loseThreshold = -0.95f;
+
+    public GameManager gameManager;
+
+    private void Start()
+    {
+        if (slider == null)
+        {
+            slider = GetComponent<Slider>();
+        }
+
+        if (slider == null)
+        {
+            Debug.LogError("Slider component not found. Please assign it in the inspector.");
+            return;
+        }
+
+        slider.minValue = minValue;
+        slider.maxValue = maxValue;
+        slider.value = startValue;
+
+        if (gameManager == null)
+        {
+            gameManager = FindObjectOfType<GameManager>();
+            if (gameManager == null)
+            {
+                Debug.LogError("GameManager not found in the scene. Please assign it in the inspector.");
+            }
+        }
+
+        UpdateValueDisplay();
+    }
+
+    public void UpdateSlider(float value)
+    {
+        slider.value += value;
+        UpdateValueDisplay();
+
+        if (slider.value >= winThreshold)
+        {
+            gameManager.HandlePlayerWin();
+        }
+        else if (slider.value <= loseThreshold)
+        {
+            gameManager.HandlePlayerLose();
+        }
+    }
+
+    private void UpdateValueDisplay()
+    {
+        if (valueText != null)
+        {
+            valueText.text = slider.value.ToString();
+        }
+    }
+}
